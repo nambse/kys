@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Style for the scrollbar track (the part the scrollbar sits in) */
+::-webkit-scrollbar {
+    width: 12px; /* width of the entire scrollbar */
+  }
+  
+  /* Style for the scrollbar handle */
+  ::-webkit-scrollbar-thumb {
+    background-color: #4B5563; /* color of the scrollbar itself */
+    border-radius: 6px; /* roundness of the scrollbar */
+    border: 3px solid #F3F4F6; /* creates padding around the scrollbar */
+  }
+  
+  /* Optional: Style for scrollbar track */
+  ::-webkit-scrollbar-track {
+    background: #F3F4F6; /* color of the scrollbar track */
+  }
+  
+  /* Optional: Style for scrollbar corner */
+  ::-webkit-scrollbar-corner {
+    background-color: transparent;
+  }
