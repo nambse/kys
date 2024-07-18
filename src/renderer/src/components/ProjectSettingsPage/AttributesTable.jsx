@@ -56,10 +56,12 @@ const DraggableHeader = ({ attr, index, moveAttribute }) => {
     <th
       ref={ref}
       style={{ opacity, cursor: 'move' }}
-      className="px-6 py-3 border-b border-gray-300 text-left text-xs font-semibold text-white uppercase tracking-wider"
+      className="px-6 py-3 border-b border-gray-300 text-xs font-semibold text-white uppercase tracking-wider"
       data-handler-id={handlerId}
     >
-      {attr.label}
+      <div className="flex items-center justify-center h-full">
+        {attr.label}
+      </div>
     </th>
   );
 };
@@ -91,12 +93,15 @@ const AttributesTable = ({ attributes, onRemove, moveAttribute, type }) => {
                 key={attr.key}
                 className="px-6 py-4 border-b border-gray-300 text-sm text-gray-800"
               >
-                <button
-                  onClick={() => onRemove(attr.key)}
-                  className="text-red-500 hover:text-red-700"
-                >
-                  <FaTrash />
-                </button>
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => onRemove(attr.key)}
+                    className="text-red-500 hover:text-red-700 p-2"
+                    aria-label={`Remove ${attr.label}`}
+                  >
+                    <FaTrash />
+                  </button>
+                </div>
               </td>
             ))}
           </tr>

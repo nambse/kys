@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Fragment, useCallback } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
-import { FaPlus, FaTrash } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaSave, FaFileExcel, FaUserFriends, FaHome, FaCog, FaTable } from 'react-icons/fa';
 import AlertComponent from '../components/AlertComponent';
 import Bubbles from '../components/ProjectSettingsPage/Bubbles';
 import AttributesTable from '../components/ProjectSettingsPage/AttributesTable';
@@ -44,7 +44,8 @@ const ProjectSettingsPage = ({ onClose }) => {
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
   const [alertType, setAlertType] = useState('bg-red-500');
-  const [isOpen, setIsOpen] = useState(false);
+  const [isKatilimciImportOpen, setIsKatilimciImportOpen] = useState(false);
+  const [isKonutImportOpen, setIsKonutImportOpen] = useState(false);
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
   const [confirmType, setConfirmType] = useState('');
 
@@ -83,6 +84,7 @@ const ProjectSettingsPage = ({ onClose }) => {
       setIsConfirmationModalOpen(true);
     } else {
       saveSettings('konutAttributes', konutAttributes, 'Konut');
+      checkAndCreateKonutlarTable(konutAttributes);
     }
   };
 
@@ -95,6 +97,7 @@ const ProjectSettingsPage = ({ onClose }) => {
     } else if (confirmType === 'konut') {
       window.electron.ipcRenderer.send('delete-konut-table', projectInfo.id);
       saveSettings('konutAttributes', konutAttributes, 'Konut');
+      checkAndCreateKonutlarTable(konutAttributes);
     }
   };
 
@@ -168,31 +171,53 @@ const ProjectSettingsPage = ({ onClose }) => {
   }, []);
 
   const onCloseImportModal = () => {
-    setIsOpen(false);
+    setIsKatilimciImportOpen(false);
+    setIsKonutImportOpen(false);
   };
 
-  const onSubmit = (data) => {
+  const onSubmitKatilimci = (data) => {
     const validData = data.validData || [];
-    sendAndSaveData(validData);
-    setIsOpen(false);
+    sendAndSaveKatilimciData(validData);
+    setIsKatilimciImportOpen(false);
   };
 
-  const sendAndSaveData = (data) => {
-    setIsLoading(true);
+  const onSubmitKonut = (data) => {
+    const validData = data.validData || [];
+    sendAndSaveKonutData(validData);
+    setIsKonutImportOpen(false);
+  };
+
+  const sendAndSaveKatilimciData = (data) => {
     window.electron.ipcRenderer.send('add-katilimcilar', { projectId: projectInfo.id, data });
 
     window.electron.ipcRenderer.once('add-katilimcilar-response', (event, args) => {
       if (args.success) {
-        setAlertMessage('Veriler başarıyla kaydedildi.');
+        setAlertMessage('Katılımcılar başarıyla kaydedildi.');
         setAlertType('bg-green-500');
         setShowAlert(true);
       } else {
         console.error(args.error);
-        setAlertMessage('Veri kaydedilirken bir hata oluştu.');
+        setAlertMessage('Katılımcı verisi kaydedilirken bir hata oluştu.');
         setAlertType('bg-red-500');
         setShowAlert(true);
       }
-      setIsLoading(false);
+    });
+  };
+
+  const sendAndSaveKonutData = (data) => {
+    window.electron.ipcRenderer.send('add-konutlar', { projectId: projectInfo.id, data });
+
+    window.electron.ipcRenderer.once('add-konutlar-response', (event, args) => {
+      if (args.success) {
+        setAlertMessage('Konular başarıyla kaydedildi.');
+        setAlertType('bg-green-500');
+        setShowAlert(true);
+      } else {
+        console.error(args.error);
+        setAlertMessage('Konut verisi kaydedilirken bir hata oluştu.');
+        setAlertType('bg-red-500');
+        setShowAlert(true);
+      }
     });
   };
 
@@ -221,7 +246,38 @@ const ProjectSettingsPage = ({ onClose }) => {
     });
   };
 
-  const fields = katilimciAttributes.map(attr => ({
+  const checkAndCreateKonutlarTable = (konutAttributes) => {
+    window.electron.ipcRenderer.send('check-konutlar-table', { projectId: projectInfo.id });
+
+    window.electron.ipcRenderer.once('check-konutlar-table-response', (event, args) => {
+      if (!args.exists) {
+        createKonutlarTable(konutAttributes);
+      }
+    });
+  };
+
+  const createKonutlarTable = (konutAttributes) => {
+    const keys = konutAttributes.map(attr => attr.key);
+    console.log(keys)
+    window.electron.ipcRenderer.send('create-konutlar-table', { projectId: projectInfo.id, attributes: keys });
+
+    window.electron.ipcRenderer.once('create-konutlar-table-response', (event, args) => {
+      if (args.success) {
+        console.log('Konutlar table created successfully');
+      } else {
+        console.error(args);
+      }
+    });
+  };
+
+  const fieldsKatilimci = katilimciAttributes.map(attr => ({
+    label: attr.label,
+    key: attr.key,
+    fieldType: { type: "input" },
+    validations: [{ rule: "required", errorMessage: `${attr.label} is required` }]
+  }));
+
+  const fieldsKonut = konutAttributes.map(attr => ({
     label: attr.label,
     key: attr.key,
     fieldType: { type: "input" },
@@ -233,80 +289,107 @@ const ProjectSettingsPage = ({ onClose }) => {
 
   return (
     <Fragment>
-      <div className="flex justify-center items-center min-h-screen bg-gray-50">
-        <div className="p-8 bg-gray-50 min-h-screen max-w-7xl w-full">
-          <h2 className="text-4xl font-bold text-gray-800 mb-8">{projectInfo.projectName} Kura Ayarları</h2>
+      <div className="flex justify-center items-center bg-gray-100 min-h-screen">
+        <div className="w-full max-w-7xl p-6 bg-white rounded-lg shadow-md min-h-[calc(100vh-100px)] flex flex-col">
+          <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center flex items-center justify-center">
+            <FaCog className="mr-2 text-blue-600" />
+            {projectInfo.projectName} Kura Ayarları
+          </h2>
 
-          <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
-            <h3 className="text-2xl font-semibold text-gray-700 mb-4">Katılımcı Tablosu Başlıkları</h3>
-            <Bubbles items={availableKatilimciAttributes.map(attr => attr.label)} onClick={(item) => handleAddAttribute(predefinedKatilimciAttributes.find(attr => attr.label === item), setKatilimciAttributes, katilimciAttributes, setIsKatilimciUpdating)} />
-            <div className="flex items-center mb-4">
-              <input
-                type="text"
-                value={newKatilimciAttribute}
-                onChange={(e) => handleInputChange(setNewKatilimciAttribute, e.target.value)}
-                placeholder="Yeni Başlık"
-                className="border border-gray-300 rounded-md p-2 mr-2 w-1/4"
-              />
-              <button
-                onClick={() => handleAddAttribute({ key: newKatilimciAttribute.replace(/\s+/g, '_').toLowerCase(), label: newKatilimciAttribute }, setKatilimciAttributes, katilimciAttributes, setIsKatilimciUpdating)}
-                className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-700"
-              >
-                <FaPlus />
-              </button>
+          <div className="flex-grow">
+            <div className="bg-white rounded-lg shadow-md mb-8 border border-gray-200">
+              <div className="border-b border-gray-200 p-4 bg-blue-50">
+                <h3 className="text-xl font-semibold text-gray-700 flex items-center">
+                  <FaUserFriends className="mr-2 text-blue-600" />
+                  Katılımcı Tablosu Başlıkları
+                </h3>
+              </div>
+              <div className="p-6">
+                <Bubbles items={availableKatilimciAttributes.map(attr => attr.label)} onClick={(item) => handleAddAttribute(predefinedKatilimciAttributes.find(attr => attr.label === item), setKatilimciAttributes, katilimciAttributes, setIsKatilimciUpdating)} />
+                <div className="flex items-center mt-4 mb-4">
+                  <input
+                    type="text"
+                    value={newKatilimciAttribute}
+                    onChange={(e) => handleInputChange(setNewKatilimciAttribute, e.target.value)}
+                    placeholder="Yeni Başlık"
+                    className="border border-gray-300 rounded-md p-2 mr-2 w-1/4"
+                  />
+                  <button
+                    onClick={() => handleAddAttribute({ key: newKatilimciAttribute.replace(/\s+/g, '_').toLowerCase(), label: newKatilimciAttribute }, setKatilimciAttributes, katilimciAttributes, setIsKatilimciUpdating)}
+                    className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors duration-300 flex items-center"
+                  >
+                    <FaPlus className="mr-2" /> Ekle
+                  </button>
+                </div>
+                <AttributesTable
+                  attributes={katilimciAttributes}
+                  onRemove={(attrKey) => handleRemoveAttribute(attrKey, setKatilimciAttributes, katilimciAttributes, setIsKatilimciUpdating)}
+                  moveAttribute={moveAttribute}
+                  type="katilimci"
+                />
+                <div className="flex space-x-4 mt-4">
+                  <button
+                    onClick={handleSaveKatilimciSettings}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors duration-300 flex items-center"
+                  >
+                    <FaSave className="mr-2" /> Katılımcı Ayarlarını Kaydet
+                  </button>
+                  <button
+                    onClick={() => setIsKatilimciImportOpen(true)}
+                    className="bg-green-500 text-white px-6 py-3 rounded-md hover:bg-green-600 transition-colors duration-300 flex items-center"
+                  >
+                    <FaFileExcel className="mr-2" /> Otomatik Excel Yükleme
+                  </button>
+                </div>
+              </div>
             </div>
-              <AttributesTable
-              attributes={katilimciAttributes}
-              onRemove={(attrKey) => handleRemoveAttribute(attrKey, setKatilimciAttributes, katilimciAttributes, setIsKatilimciUpdating)}
-              moveAttribute={moveAttribute}
-              type="katilimci"
-              />
-            <div className="flex space-x-4">
-              <button
-                onClick={handleSaveKatilimciSettings}
-                className="bg-blue-500 text-white px-6 py-3 rounded-md hover:bg-blue-700 mt-4"
-              >
-                Katılımcı Ayarlarını Kaydet
-              </button>
-              <button
-                onClick={() => setIsOpen(true)}
-                className="bg-green-500 text-white px-6 py-3 rounded-md hover:bg-green-700 mt-4"
-              >
-                Otomatik Excel Yükleme
-              </button>
-            </div>
-          </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
-            <h3 className="text-2xl font-semibold text-gray-700 mb-4">Konut Tablosu Başlıkları</h3>
-            <Bubbles items={availableKonutAttributes.map(attr => attr.label)} onClick={(item) => handleAddAttribute(predefinedKonutAttributes.find(attr => attr.label === item), setKonutAttributes, konutAttributes, setIsKonutUpdating)} />
-            <div className="flex items-center mb-4">
-              <input
-                type="text"
-                value={newKonutAttribute}
-                onChange={(e) => handleInputChange(setNewKonutAttribute, e.target.value)}
-                placeholder="Yeni Başlık"
-                className="border border-gray-300 rounded-md p-2 mr-2 w-1/4"
-              />
-              <button
-                onClick={() => handleAddAttribute({ key: newKonutAttribute.replace(/\s+/g, '_').toLowerCase(), label: newKonutAttribute }, setKonutAttributes, konutAttributes, setIsKonutUpdating)}
-                className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-700"
-              >
-                <FaPlus />
-              </button>
+            <div className="bg-white rounded-lg shadow-md mb-8 border border-gray-200">
+              <div className="border-b border-gray-200 p-4 bg-green-50">
+                <h3 className="text-xl font-semibold text-gray-700 flex items-center">
+                  <FaHome className="mr-2 text-green-600" />
+                  Konut Tablosu Başlıkları
+                </h3>
+              </div>
+              <div className="p-6">
+                <Bubbles items={availableKonutAttributes.map(attr => attr.label)} onClick={(item) => handleAddAttribute(predefinedKonutAttributes.find(attr => attr.label === item), setKonutAttributes, konutAttributes, setIsKonutUpdating)} />
+                <div className="flex items-center mt-4 mb-4">
+                  <input
+                    type="text"
+                    value={newKonutAttribute}
+                    onChange={(e) => handleInputChange(setNewKonutAttribute, e.target.value)}
+                    placeholder="Yeni Başlık"
+                    className="border border-gray-300 rounded-md p-2 mr-2 w-1/4"
+                  />
+                  <button
+                    onClick={() => handleAddAttribute({ key: newKonutAttribute.replace(/\s+/g, '_').toLowerCase(), label: newKonutAttribute }, setKonutAttributes, konutAttributes, setIsKonutUpdating)}
+                    className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors duration-300 flex items-center"
+                  >
+                    <FaPlus className="mr-2" /> Ekle
+                  </button>
+                </div>
+                <AttributesTable
+                  attributes={konutAttributes}
+                  onRemove={(attrKey) => handleRemoveAttribute(attrKey, setKonutAttributes, konutAttributes, setIsKonutUpdating)}
+                  moveAttribute={moveAttribute}
+                  type="konut"
+                />
+                <div className="flex space-x-4 mt-4">
+                  <button
+                    onClick={handleSaveKonutSettings}
+                    className="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 transition-colors duration-300 flex items-center"
+                  >
+                    <FaSave className="mr-2" /> Konut Ayarlarını Kaydet
+                  </button>
+                  <button
+                    onClick={() => setIsKonutImportOpen(true)}
+                    className="bg-green-500 text-white px-6 py-3 rounded-md hover:bg-green-600 transition-colors duration-300 flex items-center"
+                  >
+                    <FaFileExcel className="mr-2" /> Otomatik Excel Yükleme
+                  </button>
+                </div>
+              </div>
             </div>
-              <AttributesTable
-                attributes={konutAttributes}
-                onRemove={(attrKey) => handleRemoveAttribute(attrKey, setKonutAttributes, konutAttributes, setIsKonutUpdating)}
-                moveAttribute={moveAttribute}
-                type="konut"
-              />
-            <button
-              onClick={handleSaveKonutSettings}
-              className="bg-blue-500 text-white px-6 py-3 rounded-md hover:bg-blue-700 mt-4"
-            >
-              Konut Ayarlarını Kaydet
-            </button>
           </div>
 
           {showAlert && (
@@ -329,20 +412,28 @@ const ProjectSettingsPage = ({ onClose }) => {
             onConfirm={handleConfirm}
             onCancel={handleCancel}
           />
+
+          <ReactSpreadsheetImport
+            isOpen={isKatilimciImportOpen}
+            onClose={onCloseImportModal}
+            onSubmit={onSubmitKatilimci}
+            fields={fieldsKatilimci}
+            translations={translations}
+          />
+
+          <ReactSpreadsheetImport
+            isOpen={isKonutImportOpen}
+            onClose={onCloseImportModal}
+            onSubmit={onSubmitKonut}
+            fields={fieldsKonut}
+            translations={translations}
+          />
+
+          <SidebarNav 
+            checkIfDbSelected={projectInfo}
+            selectedProject={projectInfo}
+          />
         </div>
-        
-        <ReactSpreadsheetImport
-          isOpen={isOpen}
-          onClose={onCloseImportModal}
-          onSubmit={onSubmit}
-          fields={fields}
-          translations={translations}
-        />
-        
-        <SidebarNav 
-        checkIfDbSelected={projectInfo}
-        selectedProject={projectInfo}
-        />
       </div>
     </Fragment>
   );

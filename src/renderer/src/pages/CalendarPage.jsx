@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isToday, isSameMonth } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -55,12 +55,19 @@ const CalendarPage = () => {
     fetchProjects();
   }, []);
 
+  const getRandomColor = () => {
+    const formalColors = ['#2C5282', '#2F855A', '#D69E2E', '#2A4365', '#2C7A7B', '#5A67D8'];
+    return formalColors[Math.floor(Math.random() * formalColors.length)];
+  };
+
   useEffect(() => {
     const calendarEvents = projects.map(project => {
       const startDateTime = parseISO(`${project.raffleDate}T${project.raffleTime}`);
       return {
         title: project.projectName,
         start: startDateTime,
+        backgroundColor: getRandomColor(),
+        borderColor: getRandomColor(),
         extendedProps: {
           details: {
             projectName: project.projectName,
@@ -367,18 +374,42 @@ const CalendarPage = () => {
   const renderEventContent = (eventInfo) => {
     const startTime = format(eventInfo.event.start, 'HH:mm', { locale: tr });
     const isDayView = currentView === 'dayGridDay';
-
+  
     return (
-      <div className={`${isDayView ? 'w-1/5' : 'w-4/5'} mx-auto p-2 bg-blue-600 text-white rounded-lg shadow-md transform transition-transform hover:scale-105 mt-2`}>
-        <h3 className="text-sm font-semibold overflow-hidden">{eventInfo.event.title}</h3>
-        <p className="text-xs">{startTime}</p>
+      <div 
+        className={`${isDayView ? 'w-full' : 'w-full'} mx-auto p-2 rounded-lg shadow-md transform transition-all duration-300 hover:scale-105 hover:shadow-lg`}
+        style={{ backgroundColor: eventInfo.event.backgroundColor, color: 'white' }}
+      >
+        <h3 className="text-sm font-semibold overflow-hidden truncate">{eventInfo.event.title}</h3>
+        <p className="text-xs flex items-center"><FaCalendarAlt className="mr-1" /> {startTime}</p>
+      </div>
+    );
+  };
+
+  const dayCellContent = (args) => {
+    const dayNumber = args.dayNumberText;
+    const isCurrentMonth = isSameMonth(args.date, currentDate);
+    const events = args.view.calendar.getEvents().filter(event => 
+      event.start.toDateString() === args.date.toDateString()
+    );
+  
+    return (
+      <div className={`h-full w-full p-1 ${isToday(args.date) ? 'bg-blue-100' : ''} ${isCurrentMonth ? '' : 'bg-gray-100'}`}>
+        <div className={`text-right ${isToday(args.date) ? 'font-bold text-blue-600' : ''}`}>
+          {dayNumber}
+        </div>
+        {events.length > 0 && (
+          <div className="mt-1 text-xs text-gray-600">
+            {events.length} Kura
+          </div>
+        )}
       </div>
     );
   };
 
   return (
     <div className="h-screen bg-gray-100 flex justify-center items-center p-4">
-      <div className="w-full max-w-7xl bg-white rounded-lg shadow-lg h-[90%]">
+      <div className="w-full max-w-7xl bg-white rounded-lg shadow-lg h-[95%]">
         <div className="p-6 h-full flex flex-col">
           {renderCustomToolbar()}
           <div className="flex-grow overflow-auto">
@@ -399,18 +430,18 @@ const CalendarPage = () => {
               height="auto"
               contentHeight="auto"
               themeSystem="standard"
+              dayCellContent={dayCellContent}
               eventContent={renderEventContent}
-              dayMaxEvents={true}
-              dateClick={handleDateClick} // Handle date click to open modal
+              dayMaxEvents={3}
+              dateClick={handleDateClick}
               eventMouseEnter={(info) => {
-                info.el.classList.add('bg-blue-700', 'text-white');
                 info.el.style.transform = 'scale(1.05)';
-                info.el.style.transition = 'transform 0.2s';
+                info.el.style.transition = 'all 0.2s';
               }}
               eventMouseLeave={(info) => {
-                info.el.classList.remove('bg-blue-700', 'text-white');
                 info.el.style.transform = 'scale(1)';
               }}
+              dayCellClassNames="hover:bg-blue-50 transition-colors duration-300"
               viewDidMount={(viewInfo) => {
                 setCurrentView(viewInfo.view.type);
               }}
@@ -426,13 +457,13 @@ const CalendarPage = () => {
         >
           <button
             onClick={closePopup}
-            className="absolute top-2 right-2 p-2 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300"
+            className="absolute top-1 right-1 p-2 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300"
           >
             <FaTimes />
           </button>
           <button
             onClick={() => openEditModal(selectedEvent.extendedProps.details)}
-            className="absolute top-2 right-12 p-2 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300"
+            className="absolute top-1 right-11 p-2 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300"
           >
             <FaEdit />
           </button>

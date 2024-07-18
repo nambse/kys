@@ -554,7 +554,7 @@ ipcMain.on('create-konutlar-table', (event, args) => {
       return;
     }
     const tableName = row.konutTableName;
-    const columns = attributes.map(attr => `${attr.key} TEXT`).join(', ');
+    const columns = attributes.map(attr => `${attr} TEXT`).join(', ');
     const createTableQuery = `CREATE TABLE IF NOT EXISTS ${tableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, ${columns});`;
 
     db.run(createTableQuery, [], (err) => {
@@ -680,6 +680,35 @@ ipcMain.on('delete-konut-row', (event, args) => {
         event.reply('delete-konut-row-response', { success: false, message: err.message });
       } else {
         event.reply('delete-konut-row-response', { success: true });
+      }
+    });
+  });
+});
+
+// Update a single row in the konutlar table
+ipcMain.on('update-konut-row', (event, { projectId, updatedRow }) => {
+  const getTableNameQuery = `SELECT konutTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('update-konut-row-response', { success: false, message: err.message });
+      return;
+    }
+    const tableName = row.konutTableName;
+    const { id, ...rest } = updatedRow;
+    const setClause = Object.keys(rest).map(key => `${key} = ?`).join(', ');
+    const values = [...Object.values(rest), id];
+    const updateQuery = `
+      UPDATE ${tableName}
+      SET ${setClause}
+      WHERE id = ?;
+    `;
+
+    executeQuery(updateQuery, values, (err) => {
+      if (err) {
+        event.reply('update-konut-row-response', { success: false, message: err.message });
+      } else {
+        event.reply('update-konut-row-response', { success: true, values: values, row: updatedRow });
       }
     });
   });
