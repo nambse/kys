@@ -9,8 +9,8 @@ import sqlite3 from 'sqlite3';
 function createWindow() {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 1440,
+    height: 900,
     show: false,
     autoHideMenuBar: false,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -35,7 +35,7 @@ function createWindow() {
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
 }
 
@@ -50,8 +50,8 @@ app.whenReady().then(() => {
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
+    optimizer.watchWindowShortcuts(window);
+  });
 
   createWindow()
 
@@ -97,38 +97,17 @@ const createTablesQuery = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     projectName TEXT,
     projectLocation TEXT,
-    raffleTimeout DOUBLE,
-    raffleUserCount INTEGER
-  );
-  
-  CREATE TABLE IF NOT EXISTS katilimcilar (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    projectId INTEGER,
-    siraNo TEXT UNIQUE,
-    adSoyad TEXT,
-    basvuruNo TEXT,
-    asilYedek TEXT,
-    basvuruKategorisi TEXT,
-    tc TEXT,
-    il TEXT,
-    ilce TEXT,
-    mahalle TEXT,
-    huid TEXT,
-    FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE CASCADE
-  );
-  
-  CREATE TABLE IF NOT EXISTS konutlar (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    projectId INTEGER,
-    konutSiraNo TEXT UNIQUE,
-    bbNo TEXT,
-    etap TEXT,
-    blokNo TEXT,
-    katNo TEXT,
-    daireNo TEXT,
-    odaSayisi TEXT,
-    brüt TEXT,
-    FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE CASCADE
+    projectOwner TEXT,
+    projectBranch TEXT,
+    raffleType TEXT,
+    raffleCategory TEXT,
+    raffleDate TEXT,
+    raffleTime TEXT,
+    raffleHouseCount INTEGER,
+    raffleApplicantCount INTEGER,
+    raffleTags TEXT,
+    katilimciTableName TEXT,
+    konutTableName TEXT
   );
 
   CREATE TABLE IF NOT EXISTS settings (
@@ -136,6 +115,7 @@ const createTablesQuery = `
     projectId INTEGER,
     settingKey TEXT,
     settingValue TEXT,
+    UNIQUE(projectId, settingKey),
     FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE CASCADE
   );
 `;
@@ -161,37 +141,69 @@ function executeQuery(query, params = [], callback) {
   });
 }
 
+// Project-related IPC handlers
 // Add a new project
 ipcMain.on('add-project', (event, data) => {
-  const { projectName, projectLocation, raffleTimeout, raffleUserCount } = data;
-  const insertQuery = `
-    INSERT INTO projects (projectName, projectLocation, raffleTimeout, raffleUserCount)
-    VALUES (?, ?, ?, ?);
+  const {
+    projectName, projectLocation, projectOwner, projectBranch, raffleType,
+    raffleCategory, raffleDate, raffleTime, raffleHouseCount, raffleApplicantCount, raffleTags
+  } = data;
+  const insertProjectQuery = `
+    INSERT INTO projects (
+      projectName, projectLocation, projectOwner, projectBranch, raffleType, raffleCategory,
+      raffleDate, raffleTime, raffleHouseCount, raffleApplicantCount, raffleTags, katilimciTableName, konutTableName
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '');
   `;
 
-  executeQuery(insertQuery, [projectName, projectLocation, raffleTimeout, raffleUserCount], (err, result) => {
+  executeQuery(insertProjectQuery, [
+    projectName, projectLocation, projectOwner, projectBranch, raffleType,
+    raffleCategory, raffleDate, raffleTime, raffleHouseCount, raffleApplicantCount, raffleTags
+  ], (err, result) => {
     if (err) {
       event.reply('add-project-response', { success: false, message: err.message });
     } else {
-      event.reply('add-project-response', { success: true, projectId: result.lastID });
+      const projectId = result.lastID;
+      const katilimciTableName = `katilimci_${projectId}`;
+      const konutTableName = `konut_${projectId}`;
+
+      const updateTableNamesQuery = `
+        UPDATE projects
+        SET katilimciTableName = ?, konutTableName = ?
+        WHERE id = ?;
+      `;
+      executeQuery(updateTableNamesQuery, [katilimciTableName, konutTableName, projectId], (updateErr) => {
+        if (updateErr) {
+          event.reply('add-project-response', { success: false, message: updateErr.message });
+        } else {
+          event.reply('add-project-response', { success: true, projectId, message: projectId });
+        }
+      });
     }
   });
 });
 
 // Update a project
 ipcMain.on('edit-project', (event, data) => {
-  const { id, projectName, projectLocation, raffleTimeout, raffleUserCount } = data;
+  const {
+    id, projectName, projectLocation, projectOwner, projectBranch, raffleType, raffleCategory,
+    raffleDate, raffleTime, raffleHouseCount, raffleApplicantCount, raffleTags
+  } = data;
   const updateQuery = `
     UPDATE projects
-    SET projectName = ?, projectLocation = ?, raffleTimeout = ?, raffleUserCount = ?
+    SET projectName = ?, projectLocation = ?, projectOwner = ?, projectBranch = ?, raffleType = ?,
+        raffleCategory = ?, raffleDate = ?, raffleTime = ?, raffleHouseCount = ?,
+        raffleApplicantCount = ?, raffleTags = ?
     WHERE id = ?;
   `;
 
-  executeQuery(updateQuery, [projectName, projectLocation, raffleTimeout, raffleUserCount, id], (err) => {
+  executeQuery(updateQuery, [
+    projectName, projectLocation, projectOwner, projectBranch, raffleType, raffleCategory,
+    raffleDate, raffleTime, raffleHouseCount, raffleApplicantCount, raffleTags, id
+  ], (err) => {
     if (err) {
       event.reply('edit-project-response', { success: false, message: err.message });
     } else {
-      event.reply('edit-project-response', { success: true });
+      event.reply('edit-project-response', { success: true, project: data });
     }
   });
 });
@@ -226,120 +238,38 @@ ipcMain.on('get-projects', (event) => {
   });
 });
 
-// Add katilimcilar
-ipcMain.on('add-katilimcilar', (event, args) => {
-  const { projectId, data } = args;
+// Project settings-related IPC handlers
+// Save project settings
+ipcMain.on('save-project-settings', (event, args) => {
+  const { projectId, settings } = args;
+  const settingsJson = JSON.stringify(settings);
   const insertQuery = `
-    INSERT INTO katilimcilar (projectId, siraNo, adSoyad, basvuruNo, asilYedek, basvuruKategorisi, tc, il, ilce, mahalle, huid)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(siraNo) DO UPDATE SET 
-      adSoyad=excluded.adSoyad, 
-      basvuruNo=excluded.basvuruNo, 
-      asilYedek=excluded.asilYedek, 
-      basvuruKategorisi=excluded.basvuruKategorisi, 
-      tc=excluded.tc, 
-      il=excluded.il, 
-      ilce=excluded.ilce, 
-      mahalle=excluded.mahalle, 
-      huid=excluded.huid;
+    INSERT INTO settings (projectId, settingKey, settingValue)
+    VALUES (?, 'projectSettings', ?)
+    ON CONFLICT(projectId, settingKey) DO UPDATE SET settingValue = excluded.settingValue;
   `;
 
-  db.serialize(() => {
-    for (const row of data) {
-      executeQuery(insertQuery, [projectId, row.siraNo, row.adSoyad, row.basvuruNo, row.asilYedek, row.basvuruKategorisi, row.tc, row.il, row.ilce, row.mahalle, row.huid], (err) => {
-        if (err) {
-          console.error('Error in upsert operation:', err.message);
-        }
-      });
+  executeQuery(insertQuery, [projectId, settingsJson], (err) => {
+    if (err) {
+      event.reply('save-project-settings-response', { success: false, message: err.message });
+    } else {
+      event.reply('save-project-settings-response', { success: true });
     }
-    event.reply('add-katilimcilar-response', { success: true });
   });
 });
 
-// Get all katilimcilar
-ipcMain.on('get-katilimcilar', (event, projectId) => {
+// Retrieve project settings
+ipcMain.on('get-project-settings', (event, projectId) => {
   const selectQuery = `
-    SELECT * FROM katilimcilar WHERE projectId = ?;
+    SELECT settingValue FROM settings WHERE projectId = ? AND settingKey = 'projectSettings';
   `;
 
-  db.all(selectQuery, [projectId], (err, rows) => {
+  db.get(selectQuery, [projectId], (err, row) => {
     if (err) {
-      event.reply('get-katilimcilar-response', { success: false, message: err.message });
+      event.reply('get-project-settings-response', { success: false, message: err.message });
     } else {
-      event.reply('get-katilimcilar-response', { success: true, data: rows });
-    }
-  });
-});
-
-// Delete all katilimcilar for a project
-ipcMain.on('delete-katilimcilar', (event, projectId) => {
-  const deleteQuery = `
-    DELETE FROM katilimcilar WHERE projectId = ?;
-  `;
-
-  executeQuery(deleteQuery, [projectId], (err) => {
-    if (err) {
-      event.reply('delete-katilimcilar-response', { success: false, message: err.message });
-    } else {
-      event.reply('delete-katilimcilar-response', { success: true });
-    }
-  });
-});
-
-// Add konutlar
-ipcMain.on('add-konutlar', (event, args) => {
-  const { projectId, data } = args;
-  const insertQuery = `
-    INSERT INTO konutlar (projectId, konutSiraNo, bbNo, etap, blokNo, katNo, daireNo, odaSayisi, brüt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(konutSiraNo) DO UPDATE SET 
-      bbNo=excluded.bbNo, 
-      etap=excluded.etap, 
-      blokNo=excluded.blokNo, 
-      katNo=excluded.katNo, 
-      daireNo=excluded.daireNo, 
-      odaSayisi=excluded.odaSayisi, 
-      brüt=excluded.brüt;
-  `;
-
-  db.serialize(() => {
-    for (const row of data) {
-      executeQuery(insertQuery, [projectId, row.konutSiraNo, row.bbNo, row.etap, row.blokNo, row.katNo, row.daireNo, row.odaSayisi, row.brüt], (err) => {
-        if (err) {
-          console.error('Error in upsert operation:', err.message);
-        }
-      });
-    }
-    event.reply('add-konutlar-response', { success: true });
-  });
-});
-
-// Get all konutlar
-ipcMain.on('get-konutlar', (event, projectId) => {
-  const selectQuery = `
-    SELECT * FROM konutlar WHERE projectId = ?;
-  `;
-
-  db.all(selectQuery, [projectId], (err, rows) => {
-    if (err) {
-      event.reply('get-konutlar-response', { success: false, message: err.message });
-    } else {
-      event.reply('get-konutlar-response', { success: true, data: rows });
-    }
-  });
-});
-
-// Delete all konutlar for a project
-ipcMain.on('delete-konutlar', (event, projectId) => {
-  const deleteQuery = `
-    DELETE FROM konutlar WHERE projectId = ?;
-  `;
-
-  executeQuery(deleteQuery, [projectId], (err) => {
-    if (err) {
-      event.reply('delete-konutlar-response', { success: false, message: err.message });
-    } else {
-      event.reply('delete-konutlar-response', { success: true });
+      const settings = row ? JSON.parse(row.settingValue) : null;
+      event.reply('get-project-settings-response', { success: true, settings });
     }
   });
 });
@@ -401,51 +331,418 @@ ipcMain.on('edit-settings', (event, args) => {
 
 // Get project details
 ipcMain.on('get-project-details', (event, projectId) => {
-    const selectQuery = `
-      SELECT * FROM projects WHERE id = ?;
-    `;
-  
-    db.get(selectQuery, [projectId], (err, row) => {
+  const selectQuery = `
+    SELECT * FROM projects WHERE id = ?;
+  `;
+
+  db.get(selectQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('get-project-details-response', { success: false, message: err.message });
+    } else {
+      event.reply('get-project-details-response', { success: true, projectInfo: row });
+    }
+  });
+});
+
+// Katilimci-related IPC handlers
+// Create katilimcilar table later when attributes are provided
+ipcMain.on('create-katilimcilar-table', (event, args) => {
+  const { projectId, attributes } = args;
+  const getTableNameQuery = `SELECT katilimciTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('create-katilimcilar-table-response', { success: false, message: err.message });
+      return;
+    }
+    const tableName = row.katilimciTableName;
+    const columns = attributes.map(attr => `${attr} TEXT`).join(', ');
+    const createTableQuery = `CREATE TABLE IF NOT EXISTS ${tableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, ${columns});`;
+
+    db.run(createTableQuery, [], (err) => {
       if (err) {
-        event.reply('get-project-details-response', { success: false, message: err.message });
+        event.reply('create-katilimcilar-table-response', { success: false, message: err.message });
       } else {
-        event.reply('get-project-details-response', { success: true, projectInfo: row });
+        event.reply('create-katilimcilar-table-response', { success: true });
       }
     });
   });
+});
+
+// Add katilimcilar
+ipcMain.on('add-katilimcilar', (event, args) => {
+  const { projectId, data } = args;
+  const getTableNameQuery = `SELECT katilimciTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('add-katilimcilar-response', { success: false, message: err.message });
+      return;
+    }
+    const tableName = row.katilimciTableName;
+    const columns = Object.keys(data[0]).join(', ');
+    const placeholders = Object.keys(data[0]).map(() => '?').join(', ');
+    const insertQuery = `INSERT INTO ${tableName} (${columns}) VALUES (${placeholders});`;
+
+    db.serialize(() => {
+      for (const row of data) {
+        const values = Object.values(row);
+        executeQuery(insertQuery, values, (err) => {
+          if (err) {
+            console.error('Error in insert operation:', err.message);
+          }
+        });
+      }
+      event.reply('add-katilimcilar-response', { success: true });
+    });
+  });
+});
+
+// Get all katilimcilar
+ipcMain.on('get-katilimcilar', (event, projectId) => {
+  const getTableNameQuery = `SELECT katilimciTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('get-katilimcilar-response', { success: false, message: err.message });
+      return;
+    }
+    const tableName = row.katilimciTableName;
+    const selectQuery = `SELECT * FROM ${tableName};`;
+
+    db.all(selectQuery, [], (err, rows) => {
+      if (err) {
+        event.reply('get-katilimcilar-response', { success: false, message: err.message });
+      } else {
+        event.reply('get-katilimcilar-response', { success: true, data: rows });
+      }
+    });
+  });
+});
 
 // Update a single cell in the katilimcilar table
 ipcMain.on('update-katilimci-cell', (event, { projectId, id, field, value }) => {
-  console.log("update katilimci worked");
-  const updateQuery = `
-    UPDATE katilimcilar
-    SET ${field} = ?
-    WHERE id = ? AND projectId = ?;
-  `;
+  const getTableNameQuery = `SELECT katilimciTableName FROM projects WHERE id = ?;`;
 
-  executeQuery(updateQuery, [value, id, projectId], (err) => {
+  db.get(getTableNameQuery, [projectId], (err, row) => {
     if (err) {
       event.reply('update-katilimci-cell-response', { success: false, message: err.message });
-    } else {
-      event.reply('update-katilimci-cell-response', { success: true });
+      return;
     }
+    const tableName = row.katilimciTableName;
+    const updateQuery = `
+      UPDATE ${tableName}
+      SET ${field} = ?
+      WHERE id = ?;
+    `;
+
+    executeQuery(updateQuery, [value, id], (err) => {
+      if (err) {
+        event.reply('update-katilimci-cell-response', { success: false, message: err.message });
+      } else {
+        event.reply('update-katilimci-cell-response', { success: true });
+      }
+    });
   });
 });
 
 // Update a single row in the katilimcilar table
 ipcMain.on('update-katilimci-row', (event, { projectId, updatedRow }) => {
-  const { id, siraNo, adSoyad, basvuruNo, asilYedek, basvuruKategorisi, tc, il, ilce, mahalle, huid } = updatedRow;
-  const updateQuery = `
-    UPDATE katilimcilar
-    SET siraNo = ?, adSoyad = ?, basvuruNo = ?, asilYedek = ?, basvuruKategorisi = ?, tc = ?, il = ?, ilce = ?, mahalle = ?, huid = ?
-    WHERE id = ? AND projectId = ?;
-  `;
+  const getTableNameQuery = `SELECT katilimciTableName FROM projects WHERE id = ?;`;
 
-  executeQuery(updateQuery, [siraNo, adSoyad, basvuruNo, asilYedek, basvuruKategorisi, tc, il, ilce, mahalle, huid, id, projectId], (err) => {
+  db.get(getTableNameQuery, [projectId], (err, row) => {
     if (err) {
       event.reply('update-katilimci-row-response', { success: false, message: err.message });
-    } else {
-      event.reply('update-katilimci-row-response', { success: true });
+      return;
     }
+    const tableName = row.katilimciTableName;
+    const { id, ...rest } = updatedRow;
+    const setClause = Object.keys(rest).map(key => `${key} = ?`).join(', ');
+    const values = [...Object.values(rest), id];
+    const updateQuery = `
+      UPDATE ${tableName}
+      SET ${setClause}
+      WHERE id = ?;
+    `;
+
+    executeQuery(updateQuery, values, (err) => {
+      if (err) {
+        event.reply('update-katilimci-row-response', { success: false, message: err.message });
+      } else {
+        event.reply('update-katilimci-row-response', { success: true, values: values, row: updatedRow });
+      }
+    });
+  });
+});
+
+// Delete all katilimcilar for a project
+ipcMain.on('delete-katilimcilar', (event, projectId) => {
+  const getTableNameQuery = `SELECT katilimciTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('delete-katilimcilar-response', { success: false, message: err.message });
+      return;
+    }
+    const tableName = row.katilimciTableName;
+    const deleteQuery = `DELETE FROM ${tableName};`;
+
+    executeQuery(deleteQuery, [], (err) => {
+      if (err) {
+        event.reply('delete-katilimcilar-response', { success: false, message: err.message });
+      } else {
+        event.reply('delete-katilimcilar-response', { success: true });
+      }
+    });
+  });
+});
+
+// Delete katilimci table
+ipcMain.on('delete-katilimci-table', (event, projectId) => {
+  const getTableNameQuery = `SELECT katilimciTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('delete-katilimci-table-response', { success: false, message: err.message });
+      return;
+    }
+    const tableName = row.katilimciTableName;
+    const deleteTableQuery = `DROP TABLE IF EXISTS ${tableName};`;
+
+    db.run(deleteTableQuery, [], (err) => {
+      if (err) {
+        event.reply('delete-katilimci-table-response', { success: false, message: err.message });
+      } else {
+        event.reply('delete-katilimci-table-response', { success: true });
+      }
+    });
+  });
+});
+
+// Delete a single row in the katilimcilar table
+ipcMain.on('delete-katilimci-row', (event, args) => {
+  const { projectId, rowId } = args;
+  const getTableNameQuery = `SELECT katilimciTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('delete-katilimci-row-response', { success: false, message: err.message });
+      return;
+    }
+    const tableName = row.katilimciTableName;
+    const deleteQuery = `DELETE FROM ${tableName} WHERE id = ?;`;
+
+    executeQuery(deleteQuery, [rowId], (err) => {
+      if (err) {
+        event.reply('delete-katilimci-row-response', { success: false, message: err.message });
+      } else {
+        event.reply('delete-katilimci-row-response', { success: true, row: row, rowId: rowId });
+      }
+    });
+  });
+});
+
+// Konut-related IPC handlers
+// Create konutlar table later when attributes are provided
+ipcMain.on('create-konutlar-table', (event, args) => {
+  const { projectId, attributes } = args;
+  const getTableNameQuery = `SELECT konutTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('create-konutlar-table-response', { success: false, message: err.message });
+      return;
+    }
+    const tableName = row.konutTableName;
+    const columns = attributes.map(attr => `${attr.key} TEXT`).join(', ');
+    const createTableQuery = `CREATE TABLE IF NOT EXISTS ${tableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, ${columns});`;
+
+    db.run(createTableQuery, [], (err) => {
+      if (err) {
+        event.reply('create-konutlar-table-response', { success: false, message: err.message });
+      } else {
+        event.reply('create-konutlar-table-response', { success: true });
+      }
+    });
+  });
+});
+
+// Add konutlar
+ipcMain.on('add-konutlar', (event, args) => {
+  const { projectId, data } = args;
+  const getTableNameQuery = `SELECT konutTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('add-konutlar-response', { success: false, message: err.message });
+      return;
+    }
+    const tableName = row.konutTableName;
+    const columns = Object.keys(data[0]).join(', ');
+    const placeholders = Object.keys(data[0]).map(() => '?').join(', ');
+    const insertQuery = `INSERT INTO ${tableName} (${columns}) VALUES (${placeholders});`;
+
+    db.serialize(() => {
+      for (const row of data) {
+        const values = Object.values(row);
+        executeQuery(insertQuery, values, (err) => {
+          if (err) {
+            console.error('Error in insert operation:', err.message);
+          }
+        });
+      }
+      event.reply('add-konutlar-response', { success: true });
+    });
+  });
+});
+
+// Get all konutlar
+ipcMain.on('get-konutlar', (event, projectId) => {
+  const getTableNameQuery = `SELECT konutTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('get-konutlar-response', { success: false, message: err.message });
+      return;
+    }
+    const tableName = row.konutTableName;
+    const selectQuery = `SELECT * FROM ${tableName};`;
+
+    db.all(selectQuery, [], (err, rows) => {
+      if (err) {
+        event.reply('get-konutlar-response', { success: false, message: err.message });
+      } else {
+        event.reply('get-konutlar-response', { success: true, data: rows });
+      }
+    });
+  });
+});
+
+// Delete all konutlar for a project
+ipcMain.on('delete-konutlar', (event, projectId) => {
+  const getTableNameQuery = `SELECT konutTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('delete-konutlar-response', { success: false, message: err.message });
+      return;
+    }
+    const tableName = row.konutTableName;
+    const deleteQuery = `DELETE FROM ${tableName};`;
+
+    executeQuery(deleteQuery, [], (err) => {
+      if (err) {
+        event.reply('delete-konutlar-response', { success: false, message: err.message });
+      } else {
+        event.reply('delete-konutlar-response', { success: true });
+      }
+    });
+  });
+});
+
+// Delete konut table
+ipcMain.on('delete-konut-table', (event, projectId) => {
+  const getTableNameQuery = `SELECT konutTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('delete-konut-table-response', { success: false, message: err.message });
+      return;
+    }
+    const tableName = row.konutTableName;
+    const deleteTableQuery = `DROP TABLE IF EXISTS ${tableName};`;
+
+    db.run(deleteTableQuery, [], (err) => {
+      if (err) {
+        event.reply('delete-konut-table-response', { success: false, message: err.message });
+      } else {
+        event.reply('delete-konut-table-response', { success: true });
+      }
+    });
+  });
+});
+
+// Delete a single row in the konutlar table
+ipcMain.on('delete-konut-row', (event, args) => {
+  const { projectId, rowId } = args;
+  const getTableNameQuery = `SELECT konutTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('delete-konut-row-response', { success: false, message: err.message });
+      return;
+    }
+    const tableName = row.konutTableName;
+    const deleteQuery = `DELETE FROM ${tableName} WHERE id = ?;`;
+
+    executeQuery(deleteQuery, [rowId], (err) => {
+      if (err) {
+        event.reply('delete-konut-row-response', { success: false, message: err.message });
+      } else {
+        event.reply('delete-konut-row-response', { success: true });
+      }
+    });
+  });
+});
+
+// Check if katilimci table exists
+ipcMain.on('check-katilimcilar-table', (event, args) => {
+  const { projectId } = args;
+  const getTableNameQuery = `SELECT katilimciTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('check-katilimcilar-table-response', { success: false, exists: false, message: err.message });
+      return;
+    }
+    if (!row) {
+      event.reply('check-katilimcilar-table-response', { success: false, exists: false, message: 'Project not found' });
+      return;
+    }
+    const tableName = row.katilimciTableName;
+    const checkTableQuery = `SELECT 1 FROM ${tableName} LIMIT 1;`;
+
+    db.get(checkTableQuery, [], (err) => {
+      if (err) {
+        if (err.message.includes('no such table')) {
+          event.reply('check-katilimcilar-table-response', { success: true, exists: false });
+        } else {
+          event.reply('check-katilimcilar-table-response', { success: false, exists: false, message: err.message });
+        }
+      } else {
+        event.reply('check-katilimcilar-table-response', { success: true, exists: true });
+      }
+    });
+  });
+});
+
+// Check if konutlar table exists
+ipcMain.on('check-konutlar-table', (event, args) => {
+  const { projectId } = args;
+  const getTableNameQuery = `SELECT konutTableName FROM projects WHERE id = ?;`;
+
+  db.get(getTableNameQuery, [projectId], (err, row) => {
+    if (err) {
+      event.reply('check-konutlar-table-response', { success: false, exists: false, message: err.message });
+      return;
+    }
+    if (!row) {
+      event.reply('check-konutlar-table-response', { success: false, exists: false, message: 'Project not found' });
+      return;
+    }
+    const tableName = row.konutTableName;
+    const checkTableQuery = `SELECT 1 FROM ${tableName} LIMIT 1;`;
+
+    db.get(checkTableQuery, [], (err) => {
+      if (err) {
+        if (err.message.includes('no such table')) {
+          event.reply('check-konutlar-table-response', { success: true, exists: false });
+        } else {
+          event.reply('check-konutlar-table-response', { success: false, exists: false, message: err.message });
+        }
+      } else {
+        event.reply('check-konutlar-table-response', { success: true, exists: true });
+      }
+    });
   });
 });

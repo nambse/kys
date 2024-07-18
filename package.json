@@ -18,8 +18,15 @@
   "dependencies": {
     "@electron-toolkit/preload": "^2.0.0",
     "@electron-toolkit/utils": "^2.0.0",
+    "@fullcalendar/daygrid": "^6.1.14",
+    "@fullcalendar/interaction": "^6.1.14",
+    "@fullcalendar/react": "^6.1.14",
+    "@fullcalendar/timegrid": "^6.1.14",
     "date-fns": "^3.6.0",
+    "react-beautiful-dnd": "^13.1.1",
     "react-datepicker": "^7.1.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
     "react-modal": "^3.16.1",
     "sqlite3": "^5.1.7"
   },

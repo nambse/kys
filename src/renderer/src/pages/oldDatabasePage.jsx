@@ -10,7 +10,7 @@ import EditAddModal from '../components/EditAddModal';
 import AlertComponent from '../components/AlertComponent';
 import RedirectModal from '../components/RedirectModal';
 import { Link, useNavigate } from 'react-router-dom';
-import SidebarNav from '../components/SidebarNav';
+import SidebarNav from '../components/SideBarNav';
 
 // Register the Turkish locale with react-datepicker
 registerLocale('tr', tr);
@@ -267,53 +267,51 @@ function DatabasePage() {
                 </span>
               )}
             </div>
-            <div className="relative">
-              <button 
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  setDropdownIndex(dropdownIndex === row.index ? null : row.index); 
-                }} 
-                className="px-2 py-1 text-sm text-gray-600 hover:text-gray-800 rounded focus:outline-none focus:ring focus:ring-gray-300"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01M12 6a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM12 12a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM12 18a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" />
-                </svg>
-              </button>
-              {dropdownIndex === row.index && (
-                <div ref={dropdownRef} className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20">
-                  <button 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      toggleProjectDetails(row.original.id, row.index); 
-                      setDropdownIndex(null); 
-                    }} 
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Detayları {expandedRowIndex === row.index ? "Gizle" : "Göster"}
-                  </button>
-                  <button 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      openEditModal(row.original); 
-                      setDropdownIndex(null); 
-                    }} 
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Düzenle
-                  </button>
-                  <button 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      openDeleteModal(row.original.id); 
-                      setDropdownIndex(null); 
-                    }} 
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Sil
-                  </button>
-                </div>
-              )}
-            </div>
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                setDropdownIndex(dropdownIndex === row.index ? null : row.index); 
+              }} 
+              className="px-2 py-1 text-sm text-gray-600 hover:text-gray-800 rounded focus:outline-none focus:ring focus:ring-gray-300"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01M12 6a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM12 12a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM12 18a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" />
+              </svg>
+            </button>
+            {dropdownIndex === row.index && (
+              <div ref={dropdownRef} className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20">
+                <button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    toggleProjectDetails(row.original.id, row.index); 
+                    setDropdownIndex(null); 
+                  }} 
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Detayları {expandedRowIndex === row.index ? "Gizle" : "Göster"}
+                </button>
+                <button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    openEditModal(row.original); 
+                    setDropdownIndex(null); 
+                  }} 
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Düzenle
+                </button>
+                <button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    openDeleteModal(row.original.id); 
+                    setDropdownIndex(null); 
+                  }} 
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Sil
+                </button>
+              </div>
+            )}
           </div>
         );
       },

@@ -15,8 +15,14 @@ function BottomNav({checkIfDbSelected = true, isItRafflePage = false }) {
         <Link to="/" className="no-underline bg-gray-700 hover:bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 mx-2">
           Ayarlar ⚙️
         </Link>
+        <Link to="/takvim" className="no-underline bg-gray-700 hover:bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 mx-2">
+          Takvim
+        </Link>
         {checkIfDbSelected && (
         <Fragment>
+        <Link to="/projeayarlari" className="no-underline bg-gray-700 hover:bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 mx-2">
+          Proje Ayarları ⚙️
+        </Link>
         <Link to="/katilimci" className="no-underline bg-gray-700 hover:bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 mx-2">
             Katılımcılar 👩🏻‍👨🏻‍👦🏻‍👧🏻
           </Link>

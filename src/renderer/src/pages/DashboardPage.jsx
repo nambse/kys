@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, Fragment, useMemo, useRef } from 'react';
 import { useTable, usePagination, useGlobalFilter, useSortBy } from 'react-table';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -10,17 +10,20 @@ import EditAddModal from '../components/EditAddModal';
 import AlertComponent from '../components/AlertComponent';
 import RedirectModal from '../components/RedirectModal';
 import { Link, useNavigate } from 'react-router-dom';
-import SidebarNav from '../components/SidebarNav';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import trLocale from '@fullcalendar/core/locales/tr';
+import SidebarNav from '../components/SideBarNav';
 
 // Register the Turkish locale with react-datepicker
 registerLocale('tr', tr);
 
-// Custom filter UI for global filtering
 const GlobalFilter = ({ globalFilter, setGlobalFilter, dateFilter, setDateFilter }) => {
   const [startDate, endDate] = dateFilter || [null, null];
 
   return (
-    <div className="flex space-x-4 items-center">
+    <div className="flex space-x-4 items-center mb-4">
       <input
         value={globalFilter || ''}
         onChange={e => setGlobalFilter(e.target.value || undefined)}
@@ -38,17 +41,18 @@ const GlobalFilter = ({ globalFilter, setGlobalFilter, dateFilter, setDateFilter
         selectsRange
         isClearable
         placeholderText="Tarihe Göre Filtrele"
-        dateFormat="dd.MM.yyyy" // Set the date format to dd.MM.yyyy
+        dateFormat="dd.MM.yyyy"
         className="mt-1 block w-auto px-6 text-center py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm z-20"
-        locale="tr" // Set the locale to Turkish
+        locale="tr"
       />
     </div>
   );
 };
 
-function DatabasePage() {
+function DashboardPage() {
   const { projectInfo, setProjectInfo, projects, setProjects } = useDatabase();
   const navigate = useNavigate();
+  const calendarRef = useRef(null);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditAddModal, setShowEditAddModal] = useState(false);
@@ -66,6 +70,9 @@ function DatabasePage() {
   const [redirectPath, setRedirectPath] = useState('');
   const dropdownRef = useRef(null);
 
+  const [currentView, setCurrentView] = useState('dayGridMonth');
+  const [events, setEvents] = useState([]);
+
   useEffect(() => {
     fetchProjects();
     document.addEventListener('click', handleClickOutside, true);
@@ -73,6 +80,16 @@ function DatabasePage() {
       document.removeEventListener('click', handleClickOutside, true);
     };
   }, []);
+
+  useEffect(() => {
+    setEvents(
+      projects.map((project) => ({
+        title: project.projectName,
+        start: project.raffleDate,
+        id: project.id,
+      }))
+    );
+  }, [projects]);
 
   const fetchProjects = () => {
     window.electron.ipcRenderer.send('get-projects');
@@ -101,11 +118,9 @@ function DatabasePage() {
   };
 
   const fetchProjectDetails = (projectId, rowIndex) => {
-    console.log(projectId)
     window.electron.ipcRenderer.send('get-project-details', projectId);
     window.electron.ipcRenderer.once('get-project-details-response', (event, response) => {
       if (response.success) {
-        console.log('Project Details Fetched:', response.projectInfo);
         setProjectInfo(response.projectInfo);
         setExpandedRowIndex(rowIndex);
       } else {
@@ -200,9 +215,7 @@ function DatabasePage() {
         setAlertMessage(response.message || 'Operation successful');
         setShowAlert(true);
         fetchProjects();
-        if (isEditMode && projectInfo && projectInfo.id === currentProjectId) {
-          setProjectInfo(response.project);
-        }
+        setProjectInfo(response.projectInfo); // Update project info with the edited information
       } else {
         setAlertMessage(response.message || 'Operation failed');
         setShowAlert(true);
@@ -246,9 +259,23 @@ function DatabasePage() {
     });
   };
 
+  const handleDateClick = (arg) => {
+    setDateFilter([arg.date, arg.date]);
+    if (calendarRef.current) {
+      calendarRef.current.getApi().changeView('dayGridDay', arg.date);
+    }
+  };
+
+  const handleEventClick = (arg) => {
+    const project = projects.find((proj) => proj.id === arg.event.id);
+    if (project) {
+      toggleProjectDetails(project.id, projects.indexOf(project));
+    }
+  };
+
   const columns = useMemo(() => [
     { Header: "Proje İsmi", accessor: "projectName" },
-    { Header: "Tarih", accessor: "raffleDate", },
+    { Header: "Tarih", accessor: "raffleDate" },
     { Header: "Saat", accessor: "raffleTime" },
     { Header: "Durum", accessor: "status" },
     { Header: "Proje Şubesi", accessor: "projectBranch" },
@@ -259,7 +286,6 @@ function DatabasePage() {
         const isSelectedProject = projectInfo && projectInfo.id === row.original.id;
         return (
           <div className="relative text-end flex items-center justify-end space-x-2">
-            {/* Placeholder for badge */}
             <div className="mr-2 w-16">
               {isSelectedProject && (
                 <span className="px-2 py-1 bg-green-200 text-green-800 text-xs font-semibold rounded">
@@ -267,53 +293,51 @@ function DatabasePage() {
                 </span>
               )}
             </div>
-            <div className="relative">
-              <button 
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  setDropdownIndex(dropdownIndex === row.index ? null : row.index); 
-                }} 
-                className="px-2 py-1 text-sm text-gray-600 hover:text-gray-800 rounded focus:outline-none focus:ring focus:ring-gray-300"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01M12 6a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM12 12a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM12 18a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" />
-                </svg>
-              </button>
-              {dropdownIndex === row.index && (
-                <div ref={dropdownRef} className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20">
-                  <button 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      toggleProjectDetails(row.original.id, row.index); 
-                      setDropdownIndex(null); 
-                    }} 
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Detayları {expandedRowIndex === row.index ? "Gizle" : "Göster"}
-                  </button>
-                  <button 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      openEditModal(row.original); 
-                      setDropdownIndex(null); 
-                    }} 
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Düzenle
-                  </button>
-                  <button 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      openDeleteModal(row.original.id); 
-                      setDropdownIndex(null); 
-                    }} 
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Sil
-                  </button>
-                </div>
-              )}
-            </div>
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                setDropdownIndex(dropdownIndex === row.index ? null : row.index); 
+              }} 
+              className="px-2 py-1 text-sm text-gray-600 hover:text-gray-800 rounded focus:outline-none focus:ring focus:ring-gray-300"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01M12 6a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM12 12a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM12 18a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" />
+              </svg>
+            </button>
+            {dropdownIndex === row.index && (
+              <div ref={dropdownRef} className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20">
+                <button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    toggleProjectDetails(row.original.id, row.index); 
+                    setDropdownIndex(null); 
+                  }} 
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Detayları {expandedRowIndex === row.index ? "Gizle" : "Göster"}
+                </button>
+                <button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    openEditModal(row.original); 
+                    setDropdownIndex(null); 
+                  }} 
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Düzenle
+                </button>
+                <button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    openDeleteModal(row.original.id); 
+                    setDropdownIndex(null); 
+                  }} 
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Sil
+                </button>
+              </div>
+            )}
           </div>
         );
       },
@@ -413,17 +437,38 @@ function DatabasePage() {
   return (
     <Fragment>
       <div className="flex justify-center items-center bg-gray-100 min-h-screen">
-        <div className="w-full max-w-5xl p-6 bg-white rounded-lg shadow-md h-[calc(100vh-100px)] flex flex-col">
+        <div className="w-full max-w-5xl p-6 bg-white rounded-lg shadow-md">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-semibold text-gray-700">Proje Listesi</h2>
+            <h2 className="text-2xl font-semibold text-gray-700">Dashboard</h2>
             <button onClick={openAddModal} className="px-6 py-2 text-sm text-white bg-green-600 hover:bg-green-700 rounded focus:outline-none focus:ring focus:ring-green-300">
               Proje Ekle
             </button>
           </div>
+          
           <div className="mb-4">
             <GlobalFilter globalFilter={globalFilter} setGlobalFilter={setGlobalFilter} dateFilter={dateFilter} setDateFilter={setDateFilter} />
           </div>
-          <div className="flex-grow overflow-hidden">
+
+          <div className="mb-4">
+            <FullCalendar
+              plugins={[dayGridPlugin, interactionPlugin]}
+              initialView={currentView}
+              locale={trLocale}
+              events={events}
+              ref={calendarRef}
+              dateClick={handleDateClick}
+              eventClick={handleEventClick}
+              headerToolbar={{
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,dayGridWeek,dayGridDay'
+              }}
+              height="auto"
+              contentHeight={500}
+            />
+          </div>
+
+          <div className="flex-grow overflow-hidden mt-6">
             <div className="h-full overflow-auto">
               <table {...getTableProps()} className="min-w-full leading-normal shadow-md rounded-lg">
                 <thead className="bg-gray-700 sticky top-0 z-10">
@@ -456,8 +501,7 @@ function DatabasePage() {
                             </td>
                           ))}
                         </tr>
-                        {/* Not sure about this line, old version is this:{expandedRowIndex === row.index && projectInfo && ( */}
-                        {projectInfo && projectInfo.id === row.original.id && (
+                        {expandedRowIndex === row.index && projectInfo && (
                           <tr>
                             <td colSpan={columns.length} className="bg-gray-100 rounded-lg">
                               <div className="p-4 bg-white shadow rounded-lg flex flex-col space-y-4">
@@ -668,4 +712,4 @@ function DatabasePage() {
   );
 }
 
-export default DatabasePage;
+export default DashboardPage;

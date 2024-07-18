@@ -6,6 +6,8 @@ import KonutPage from './pages/KonutPage';
 import RafflePage from './pages/RafflePage';
 
 import './assets/index.css'
+import ProjectSettingsPage from './pages/ProjectSettingsPage';
+import CalendarPage from './pages/CalendarPage';
 
 function App() {
  return (
@@ -13,6 +15,8 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<DatabasePage />} />
+        <Route path="/takvim" element={<CalendarPage />} />
+        <Route path="/projeayarlari" element={<ProjectSettingsPage />} />
         <Route path="/katilimci" element={<KatilimciPage />} />
         <Route path="/konut" element={<KonutPage />} />
         <Route path="/raffle" element={<RafflePage />} />

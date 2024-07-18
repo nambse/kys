@@ -23,3 +23,30 @@
   ::-webkit-scrollbar-corner {
     background-color: transparent;
   }
+
+ /* Override FullCalendar styles */
+.fc .fc-daygrid-event.fc-event-mirror,
+.fc .fc-daygrid-event:hover {
+  background: none !important;
+  box-shadow: none !important;
+}
+
+.custom-datepicker {
+  z-index: 1050 !important; /* Ensure this is higher than FullCalendar's z-index */
+}
+
+/* Add this to your CSS file or include it directly in your component */
+.fc-day-today {
+  background-color: #e8f1f7 !important; /* Faded blue background */
+  color: #2c3e50 !important; /* Dark gray-blue text */
+  font-weight: 600; /* Semi-bold text for emphasis */
+  transition: background-color 0.3s ease, box-shadow 0.3s ease; /* Smooth transition effects */
+}
+
+.fc-day-today:hover {
+  background-color: #d8e7ef !important; /* Slightly darker on hover */
+}
+
+.react-datepicker-popper {
+  z-index: 30 !important;
+}
