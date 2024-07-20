@@ -50,3 +50,25 @@
 .react-datepicker-popper {
   z-index: 30 !important;
 }
+
+/* Hide scrollbars on excel takip */
+/* Hide scrollbars but allow scrolling */
+.custom-hide-scrollbars {
+  overflow: -moz-scrollbars-none;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.custom-hide-scrollbars::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
