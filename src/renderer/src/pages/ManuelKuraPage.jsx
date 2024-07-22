@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FaExchangeAlt } from 'react-icons/fa';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import { FaExchangeAlt, FaCog, FaUser, FaHome } from 'react-icons/fa';
 import { useDatabase } from '../context/DatabaseContext';
 import SidebarNav from '../components/SidebarNav';
+import LivestreamBox from '../components/LivestreamBox';
 
 const katilimciData = [
     {
@@ -174,15 +175,24 @@ const konutData = [
         const [settings, setSettings] = useState({
           layout: 'default',
           theme: {
-            headerBgColor: '#1a202c',
-            headerTextColor: '#ffffff',
-            rowEvenBgColor: '#f7fafc',
-            rowOddBgColor: '#edf2f7',
+            headerBgColor: '#2c3e50',
+            headerTextColor: '#ecf0f1',
+            rowEvenBgColor: '#f8f9fa',
+            rowOddBgColor: '#e9ecef',
             textColor: '#2d3748',
-            highlightColor: '#4299e1',
-            font: 'Arial, sans-serif',
+            highlightColor: '#3498db',
+            font: 'Roboto, sans-serif',
             cardBgColor: '#ffffff',
             cardBorderColor: '#e2e8f0',
+            inputBorderColor: '#cbd5e0',
+            inputFocusColor: '#3498db',
+            buttonBgColor: '#3498db',
+            buttonHoverColor: '#2980b9',
+          },
+          animations: {
+            rowHover: true,
+            cardHover: true,
+            fadeIn: true,
           },
         });
       
@@ -191,7 +201,11 @@ const konutData = [
         const [activeCell, setActiveCell] = useState(null);
         const tableRef = useRef(null);
         const expandedRowRefs = useRef([]);
-      
+        const cardRefs = useRef([]);
+        const [livestreamSize, setLivestreamSize] = useState({ width: 320, height: 240 });
+        const [livestreamPosition, setLivestreamPosition] = useState({ x: window.innerWidth - 340, y: window.innerHeight - 260 });
+        const [showLivestream, setShowLivestream] = useState(true);
+
         useEffect(() => {
           inputRefs.current = inputRefs.current.slice(0, raffleRows.length * 2);
           rowRefs.current = rowRefs.current.slice(0, raffleRows.length);
@@ -222,19 +236,13 @@ const konutData = [
           };
         }, []);
         
-        useEffect(() => {
-          if (settings.layout === 'expanded') {
-            expandedRowRefs.current.forEach((rowEl) => {
-              if (rowEl) {
-                const cards = rowEl.querySelectorAll('.flex-grow');
-                let maxHeight = 0;
-                cards.forEach((card) => {
-                  card.style.height = 'auto';
-                  maxHeight = Math.max(maxHeight, card.offsetHeight);
-                });
-                cards.forEach((card) => {
-                  card.style.height = `${maxHeight}px`;
-                });
+        useLayoutEffect(() => {
+          if (settings.layout === 'default' || settings.layout === 'expanded') {
+            cardRefs.current.forEach((rowCards, index) => {
+              if (rowCards[0] && rowCards[1]) {
+                const height = Math.max(rowCards[0].offsetHeight, rowCards[1].offsetHeight);
+                rowCards[0].style.height = `${height}px`;
+                rowCards[1].style.height = `${height}px`;
               }
             });
           }
@@ -365,6 +373,48 @@ const konutData = [
             }));
           };
       
+        const toggleSettings = () => {
+          // This function would open a settings modal or sidebar
+          console.log('Toggle settings');
+        };
+
+        const applyRowAnimation = (index) => {
+          if (settings.animations.rowHover) {
+            return `hover:bg-opacity-80 transition-all duration-300 ${
+              index % 2 === 0 ? 'hover:bg-blue-50' : 'hover:bg-blue-100'
+            }`;
+          }
+          return '';
+        };
+
+        const applyCardAnimation = () => {
+          if (settings.animations.cardHover) {
+            return 'hover:shadow-lg transition-shadow duration-300';
+          }
+          return '';
+        };
+
+        const renderCard = (content, icon, bgColor, index, cardIndex) => (
+          <div 
+            ref={el => {
+              if (!cardRefs.current[index]) cardRefs.current[index] = [];
+              cardRefs.current[index][cardIndex] = el;
+            }}
+            className={`${bgColor} p-2 rounded shadow ${applyCardAnimation()} ${settings.animations.fadeIn ? 'animate-fade-in' : ''}`}
+          >
+            <div className="flex h-full">
+              <div className="w-1/6 flex items-center justify-center">
+                {icon}
+              </div>
+              <div className="w-5/6 flex items-center">
+                <div>
+                  {content}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
         const renderRow = (row, index) => {
           if (index >= raffleRows.length - 1) return null;
 
@@ -373,8 +423,25 @@ const konutData = [
             color: settings.theme.textColor,
           };
 
+          const katilimciContent = row.katilimciBilgileri && (
+            <>
+              <p><strong>Ad Soyad:</strong> {row.katilimciBilgileri['ADI SOYADI']}</p>
+              <p><strong>T.C. No:</strong> {row.katilimciBilgileri['T.C No']}</p>
+              <p><strong>Başvuru Türü:</strong> {row.katilimciBilgileri['Başvuru Türü']}</p>
+            </>
+          );
+
+          const konutContent = row.konutBilgileri && (
+            <>
+              <p><strong>Blok No:</strong> {row.konutBilgileri['BLOK NO']}</p>
+              <p><strong>Daire No:</strong> {row.konutBilgileri['DAİRE NO']}</p>
+              <p><strong>Oda Sayısı:</strong> {row.konutBilgileri['ODA SAYISI']}</p>
+              <p><strong>Brüt Alan:</strong> {row.konutBilgileri['BRÜT (m²)']} m²</p>
+            </>
+          );
+
           return (
-            <tr key={index} ref={el => rowRefs.current[index] = el} style={rowStyle} className="transition-all duration-300 ease-in-out">
+            <tr key={index} ref={el => rowRefs.current[index] = el} style={rowStyle} className={`${applyRowAnimation(index)}`}>
               <td className="px-4 py-2 w-1/6">
                 <input
                   ref={el => inputRefs.current[index * 2] = el}
@@ -385,7 +452,11 @@ const konutData = [
                   onFocus={() => handleFocus(index, 'katilimciSiraNo')}
                   onBlur={() => handleBlur(index, 'katilimciSiraNo')}
                   onClick={() => handleCellClick(index, 'katilimciSiraNo')}
-                  className="w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300"
+                  className={`w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 transition-all duration-300`}
+                  style={{
+                    borderColor: settings.theme.inputBorderColor,
+                    color: settings.theme.textColor,
+                  }}
                   placeholder="Katılımcı Sıra No"
                 />
               </td>
@@ -399,27 +470,19 @@ const konutData = [
                   onFocus={() => handleFocus(index, 'konutSiraNo')}
                   onBlur={() => handleBlur(index, 'konutSiraNo')}
                   onClick={() => handleCellClick(index, 'konutSiraNo')}
-                  className="w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300"
+                  className={`w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 transition-all duration-300`}
+                  style={{
+                    borderColor: settings.theme.inputBorderColor,
+                    color: settings.theme.textColor,
+                  }}
                   placeholder="Konut Sıra No"
                 />
               </td>
               <td className="px-4 py-2 w-1/3">
-                {row.katilimciBilgileri && (
-                  <div className="animate-fade-in bg-blue-50 p-2 rounded shadow">
-                    <p><strong>Ad Soyad:</strong> {row.katilimciBilgileri['ADI SOYADI']}</p>
-                    <p><strong>T.C. No:</strong> {row.katilimciBilgileri['T.C No']}</p>
-                    <p><strong>Başvuru Türü:</strong> {row.katilimciBilgileri['Başvuru Türü']}</p>
-                  </div>
-                )}
+                {row.katilimciBilgileri && renderCard(katilimciContent, <FaUser className="text-3xl text-blue-500" />, 'bg-blue-50', index, 0)}
               </td>
               <td className="px-4 py-2 w-1/3">
-                {row.konutBilgileri && (
-                  <div className="animate-fade-in bg-green-50 p-2 rounded shadow">
-                    <p><strong>Blok No:</strong> {row.konutBilgileri['BLOK NO']}</p>
-                    <p><strong>Daire No:</strong> {row.konutBilgileri['DAİRE NO']}</p>
-                    <p><strong>Oda Sayısı:</strong> {row.konutBilgileri['ODA SAYISI']}</p>
-                  </div>
-                )}
+                {row.konutBilgileri && renderCard(konutContent, <FaHome className="text-3xl text-green-500" />, 'bg-green-50', index, 1)}
               </td>
             </tr>
           );
@@ -432,6 +495,25 @@ const konutData = [
             backgroundColor: index % 2 === 0 ? settings.theme.rowEvenBgColor : settings.theme.rowOddBgColor,
             color: settings.theme.textColor,
           };
+        
+          const katilimciContent = row.katilimciBilgileri && (
+            <>
+              <p><strong>Ad Soyad:</strong> {row.katilimciBilgileri['ADI SOYADI']}</p>
+              <p><strong>T.C. No:</strong> {row.katilimciBilgileri['T.C No']}</p>
+              <p><strong>Başvuru Türü:</strong> {row.katilimciBilgileri['Başvuru Türü']}</p>
+              <p><strong>Banka Başvuru No:</strong> {row.katilimciBilgileri['Banka Başvuru No']}</p>
+            </>
+          );
+
+          const konutContent = row.konutBilgileri && (
+            <>
+              <p><strong>Blok No:</strong> {row.konutBilgileri['BLOK NO']}</p>
+              <p><strong>Kat No:</strong> {row.konutBilgileri['KAT NO']}</p>
+              <p><strong>Daire No:</strong> {row.konutBilgileri['DAİRE NO']}</p>
+              <p><strong>Oda Sayısı:</strong> {row.konutBilgileri['ODA SAYISI']}</p>
+              <p><strong>Brüt Alan:</strong> {row.konutBilgileri['BRÜT (m²)']} m²</p>
+            </>
+          );
         
           return (
             <tr key={index} style={rowStyle}>
@@ -451,12 +533,11 @@ const konutData = [
                       placeholder="Katılımcı Sıra No"
                     />
                     {row.katilimciBilgileri && (
-                      <div className="bg-blue-50 p-3 rounded shadow-sm flex-grow">
-                        <h3 className="font-bold text-lg mb-2">Katılımcı Bilgileri</h3>
-                        <p><strong>Ad Soyad:</strong> {row.katilimciBilgileri['ADI SOYADI']}</p>
-                        <p><strong>T.C. No:</strong> {row.katilimciBilgileri['T.C No']}</p>
-                        <p><strong>Başvuru Türü:</strong> {row.katilimciBilgileri['Başvuru Türü']}</p>
-                        <p><strong>Banka Başvuru No:</strong> {row.katilimciBilgileri['Banka Başvuru No']}</p>
+                      <div className={`bg-blue-50 p-3 rounded shadow-sm flex-grow ${applyCardAnimation()} ${settings.animations.fadeIn ? 'animate-fade-in' : ''}`}>
+                        <h3 className="font-bold text-lg mb-2 flex items-center">
+                          <FaUser className="mr-2" /> Katılımcı Bilgileri
+                        </h3>
+                        {katilimciContent}
                       </div>
                     )}
                   </div>
@@ -474,13 +555,11 @@ const konutData = [
                       placeholder="Konut Sıra No"
                     />
                     {row.konutBilgileri && (
-                      <div className="bg-green-50 p-3 rounded shadow-sm flex-grow">
-                        <h3 className="font-bold text-lg mb-2">Konut Bilgileri</h3>
-                        <p><strong>Blok No:</strong> {row.konutBilgileri['BLOK NO']}</p>
-                        <p><strong>Kat No:</strong> {row.konutBilgileri['KAT NO']}</p>
-                        <p><strong>Daire No:</strong> {row.konutBilgileri['DAİRE NO']}</p>
-                        <p><strong>Oda Sayısı:</strong> {row.konutBilgileri['ODA SAYISI']}</p>
-                        <p><strong>Brüt Alan:</strong> {row.konutBilgileri['BRÜT (m²)']} m²</p>
+                      <div className={`bg-green-50 p-3 rounded shadow-sm flex-grow ${applyCardAnimation()} ${settings.animations.fadeIn ? 'animate-fade-in' : ''}`}>
+                        <h3 className="font-bold text-lg mb-2 flex items-center">
+                          <FaHome className="mr-2" /> Konut Bilgileri
+                        </h3>
+                        {konutContent}
                       </div>
                     )}
                   </div>
@@ -499,8 +578,8 @@ const konutData = [
           };
         
           return (
-            <tr key={index} ref={el => rowRefs.current[index] = el} style={rowStyle} className="transition-all duration-300 ease-in-out">
-              <td className="px-2 py-2 w-1/12">
+            <tr key={index} ref={el => rowRefs.current[index] = el} style={rowStyle} className={`${applyRowAnimation(index)}`}>
+              <td className="px-2 py-2 w-[8%]">
                 <input
                   ref={el => inputRefs.current[index * 2] = el}
                   type="text"
@@ -510,11 +589,15 @@ const konutData = [
                   onFocus={() => handleFocus(index, 'katilimciSiraNo')}
                   onBlur={() => handleBlur(index, 'katilimciSiraNo')}
                   onClick={() => handleCellClick(index, 'katilimciSiraNo')}
-                  className="w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300"
+                  className={`w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 transition-all duration-300`}
+                  style={{
+                    borderColor: settings.theme.inputBorderColor,
+                    color: settings.theme.textColor,
+                  }}
                   placeholder="Katılımcı Sıra No"
                 />
               </td>
-              <td className="px-2 py-2 w-1/12">
+              <td className="px-2 py-2 w-[8%]">
                 <input
                   ref={el => inputRefs.current[index * 2 + 1] = el}
                   type="text"
@@ -524,64 +607,116 @@ const konutData = [
                   onFocus={() => handleFocus(index, 'konutSiraNo')}
                   onBlur={() => handleBlur(index, 'konutSiraNo')}
                   onClick={() => handleCellClick(index, 'konutSiraNo')}
-                  className="w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300"
+                  className={`w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 transition-all duration-300`}
+                  style={{
+                    borderColor: settings.theme.inputBorderColor,
+                    color: settings.theme.textColor,
+                  }}
                   placeholder="Konut Sıra No"
                 />
               </td>
-              <td className="px-2 py-2 w-2/12">{row.katilimciBilgileri ? row.katilimciBilgileri['ADI SOYADI'] : ''}</td>
-              <td className="px-2 py-2 w-1/12">{row.katilimciBilgileri ? row.katilimciBilgileri['T.C No'] : ''}</td>
-              <td className="px-2 py-2 w-2/12">{row.katilimciBilgileri ? row.katilimciBilgileri['Başvuru Türü'] : ''}</td>
-              <td className="px-2 py-2 w-1/12">{row.konutBilgileri ? row.konutBilgileri['BLOK NO'] : ''}</td>
-              <td className="px-2 py-2 w-1/12">{row.konutBilgileri ? row.konutBilgileri['DAİRE NO'] : ''}</td>
-              <td className="px-2 py-2 w-1/12">{row.konutBilgileri ? row.konutBilgileri['ODA SAYISI'] : ''}</td>
-              <td className="px-2 py-2 w-1/12">{row.konutBilgileri ? row.konutBilgileri['BRÜT (m²)'] : ''}</td>
+              <td className="px-2 py-2 w-[18%]">{row.katilimciBilgileri ? row.katilimciBilgileri['ADI SOYADI'] : ''}</td>
+              <td className="px-2 py-2 w-[12%]">{row.katilimciBilgileri ? row.katilimciBilgileri['T.C No'] : ''}</td>
+              <td className="px-2 py-2 w-[14%]">{row.katilimciBilgileri ? row.katilimciBilgileri['Başvuru Türü'] : ''}</td>
+              <td className="px-2 py-2 w-[10%]">{row.konutBilgileri ? row.konutBilgileri['BLOK NO'] : ''}</td>
+              <td className="px-2 py-2 w-[10%]">{row.konutBilgileri ? row.konutBilgileri['DAİRE NO'] : ''}</td>
+              <td className="px-2 py-2 w-[10%]">{row.konutBilgileri ? row.konutBilgileri['ODA SAYISI'] : ''}</td>
+              <td className="px-2 py-2 w-[10%]">{row.konutBilgileri ? row.konutBilgileri['BRÜT (m²)'] : ''}</td>
             </tr>
           );
         };
       
+        const handleLivestreamResize = (size) => {
+          setLivestreamSize(size);
+        };
+
+        const handleLivestreamDrag = (position) => {
+          setLivestreamPosition(position);
+        };
+
+        const handleLivestreamClose = () => {
+          setShowLivestream(false);
+        };
+
+        const calculateMainContentStyle = () => {
+          if (!showLivestream) return {};
+          
+          const rightEdge = window.innerWidth - livestreamPosition.x;
+          const marginRight = Math.max(rightEdge, livestreamSize.width) + 20; // 20px extra padding
+          
+          return {
+            marginRight: `${marginRight}px`,
+            maxWidth: `calc(100% - ${marginRight}px)`,
+          };
+        };
+
         return (
-          <div className="min-h-screen bg-gray-100 flex flex-col" style={{fontFamily: settings.theme.font}}>
-            <header className="bg-white shadow-md sticky top-0 z-10">
+          <div className="min-h-screen bg-gray-100 flex flex-col relative" style={{fontFamily: settings.theme.font}}>
+            <header className="shadow-md sticky top-0 z-10" style={{backgroundColor: settings.theme.headerBgColor}}>
               <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                <h1 className="text-3xl font-bold text-gray-900">
+                <h1 className="text-3xl font-bold" style={{color: settings.theme.headerTextColor}}>
                   {projectInfo.projectName} Manuel Kura Çekimi
                 </h1>
-                <button
-                  onClick={toggleLayout}
-                  className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded inline-flex items-center transition-colors duration-300"
-                >
-                  <FaExchangeAlt className="mr-2" />
-                  {settings.layout === 'default' ? 'Genişletilmiş Görünüm' : 
-                   settings.layout === 'expanded' ? 'Tablo Görünümü' : 'Varsayılan Görünüm'}
-                </button>
+                <div>
+                  <button
+                    onClick={toggleLayout}
+                    className="mr-4 text-white font-bold py-2 px-4 rounded inline-flex items-center transition-colors duration-300"
+                    style={{
+                      backgroundColor: settings.theme.buttonBgColor,
+                      ':hover': {
+                        backgroundColor: settings.theme.buttonHoverColor,
+                      },
+                    }}
+                  >
+                    <FaExchangeAlt className="mr-2" />
+                    {settings.layout === 'default' ? 'Genişletilmiş Görünüm' : 
+                     settings.layout === 'expanded' ? 'Tablo Görünümü' : 'Varsayılan Görünüm'}
+                  </button>
+                  <button
+                    onClick={toggleSettings}
+                    className="text-white font-bold py-2 px-4 rounded inline-flex items-center transition-colors duration-300"
+                    style={{
+                      backgroundColor: settings.theme.buttonBgColor,
+                      ':hover': {
+                        backgroundColor: settings.theme.buttonHoverColor,
+                      },
+                    }}
+                  >
+                    <FaCog className="mr-2" />
+                    Ayarlar
+                  </button>
+                </div>
               </div>
             </header>
             <main className="flex-grow overflow-hidden">
-              <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+              <div 
+                className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 transition-all duration-300"
+                style={calculateMainContentStyle()}
+              >
                 <div className="overflow-x-auto bg-white shadow-md rounded-lg">
                   <table ref={tableRef} className="min-w-full" style={{fontFamily: settings.theme.font}}>
                     <thead className="bg-gray-50 sticky top-0">
                       <tr>
                         {settings.layout === 'default' ? (
                           <>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Katılımcı Sıra No</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Konut Sıra No</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Katılımcı Bilgileri</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Konut Bilgileri</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Katılımcı Sıra No</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Konut Sıra No</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Katılımcı Bilgileri</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Konut Bilgileri</th>
                           </>
                         ) : settings.layout === 'expanded' ? (
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kura Bilgileri</th>
                         ) : (
                           <>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Katılımcı Sıra No</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Konut Sıra No</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ad Soyad</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">T.C. No</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Başvuru Türü</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Blok No</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Daire No</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oda Sayısı</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brüt Alan</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[8%]">Katılımcı Sıra No</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[8%]">Konut Sıra No</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[18%]">Ad Soyad</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">T.C. No</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[14%]">Başvuru Türü</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">Blok No</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">Daire No</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">Oda Sayısı</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">Brüt Alan</th>
                           </>
                         )}
                       </tr>
@@ -598,6 +733,15 @@ const konutData = [
               </div>
             </main>
             <SidebarNav selectedProject={projectInfo} />
+            {showLivestream && (
+              <LivestreamBox 
+                onResize={handleLivestreamResize} 
+                onDrag={handleLivestreamDrag} 
+                onClose={handleLivestreamClose}
+                initialPosition={livestreamPosition}
+                initialSize={livestreamSize}
+              />
+            )}
           </div>
         );
       };
