@@ -181,6 +181,8 @@ const konutData = [
             textColor: '#2d3748',
             highlightColor: '#4299e1',
             font: 'Arial, sans-serif',
+            cardBgColor: '#ffffff',
+            cardBorderColor: '#e2e8f0',
           },
         });
       
@@ -188,12 +190,56 @@ const konutData = [
         const rowRefs = useRef([]);
         const [activeCell, setActiveCell] = useState(null);
         const tableRef = useRef(null);
+        const expandedRowRefs = useRef([]);
       
         useEffect(() => {
           inputRefs.current = inputRefs.current.slice(0, raffleRows.length * 2);
           rowRefs.current = rowRefs.current.slice(0, raffleRows.length);
         }, [raffleRows]);
       
+        useEffect(() => {
+          let previousHeight = document.documentElement.scrollHeight;
+        
+          const scrollToBottomIfNeeded = () => {
+            const currentHeight = document.documentElement.scrollHeight;
+            if (currentHeight > previousHeight) {
+              window.scrollTo({ top: currentHeight, behavior: 'smooth' });
+            }
+            previousHeight = currentHeight;
+          };
+        
+          const resizeObserver = new ResizeObserver(() => {
+            scrollToBottomIfNeeded();
+          });
+        
+          resizeObserver.observe(document.documentElement);
+        
+          window.addEventListener('resize', scrollToBottomIfNeeded);
+        
+          return () => {
+            resizeObserver.unobserve(document.documentElement);
+            window.removeEventListener('resize', scrollToBottomIfNeeded);
+          };
+        }, []);
+        
+        useEffect(() => {
+          if (settings.layout === 'expanded') {
+            expandedRowRefs.current.forEach((rowEl) => {
+              if (rowEl) {
+                const cards = rowEl.querySelectorAll('.flex-grow');
+                let maxHeight = 0;
+                cards.forEach((card) => {
+                  card.style.height = 'auto';
+                  maxHeight = Math.max(maxHeight, card.offsetHeight);
+                });
+                cards.forEach((card) => {
+                  card.style.height = `${maxHeight}px`;
+                });
+              }
+            });
+          }
+        }, [raffleRows, settings.layout]);
+
         const handleInputChange = (index, field, value) => {
           const updatedRows = [...raffleRows];
           updatedRows[index][field] = value;
@@ -306,29 +352,30 @@ const konutData = [
           };
         
           const handleCellClick = (rowIndex, field) => {
-            if (field === 'konutSiraNo' && rowIndex === raffleRows.length - 2) {
-              moveToNextRow(rowIndex);
-            }
+            // Remove this condition to prevent creating a new row on click
+            // if (field === 'konutSiraNo' && rowIndex === raffleRows.length - 2) {
+            //   moveToNextRow(rowIndex);
+            // }
           };
       
-        const toggleLayout = () => {
-          setSettings(prev => ({
-            ...prev,
-            layout: prev.layout === 'default' ? 'expanded' : 'default',
-          }));
-        };
+          const toggleLayout = () => {
+            setSettings(prev => ({
+              ...prev,
+              layout: prev.layout === 'default' ? 'expanded' : (prev.layout === 'expanded' ? 'tabular' : 'default'),
+            }));
+          };
       
         const renderRow = (row, index) => {
           if (index >= raffleRows.length - 1) return null;
-      
+
           const rowStyle = {
             backgroundColor: index % 2 === 0 ? settings.theme.rowEvenBgColor : settings.theme.rowOddBgColor,
             color: settings.theme.textColor,
           };
-      
+
           return (
             <tr key={index} ref={el => rowRefs.current[index] = el} style={rowStyle} className="transition-all duration-300 ease-in-out">
-              <td className="px-4 py-2">
+              <td className="px-4 py-2 w-1/6">
                 <input
                   ref={el => inputRefs.current[index * 2] = el}
                   type="text"
@@ -342,7 +389,7 @@ const konutData = [
                   placeholder="Katılımcı Sıra No"
                 />
               </td>
-              <td className="px-4 py-2">
+              <td className="px-4 py-2 w-1/6">
                 <input
                   ref={el => inputRefs.current[index * 2 + 1] = el}
                   type="text"
@@ -356,18 +403,18 @@ const konutData = [
                   placeholder="Konut Sıra No"
                 />
               </td>
-              <td className="px-4 py-2">
+              <td className="px-4 py-2 w-1/3">
                 {row.katilimciBilgileri && (
-                  <div className="animate-fade-in">
+                  <div className="animate-fade-in bg-blue-50 p-2 rounded shadow">
                     <p><strong>Ad Soyad:</strong> {row.katilimciBilgileri['ADI SOYADI']}</p>
                     <p><strong>T.C. No:</strong> {row.katilimciBilgileri['T.C No']}</p>
                     <p><strong>Başvuru Türü:</strong> {row.katilimciBilgileri['Başvuru Türü']}</p>
                   </div>
                 )}
               </td>
-              <td className="px-4 py-2">
+              <td className="px-4 py-2 w-1/3">
                 {row.konutBilgileri && (
-                  <div className="animate-fade-in">
+                  <div className="animate-fade-in bg-green-50 p-2 rounded shadow">
                     <p><strong>Blok No:</strong> {row.konutBilgileri['BLOK NO']}</p>
                     <p><strong>Daire No:</strong> {row.konutBilgileri['DAİRE NO']}</p>
                     <p><strong>Oda Sayısı:</strong> {row.konutBilgileri['ODA SAYISI']}</p>
@@ -380,17 +427,17 @@ const konutData = [
       
         const renderExpandedRow = (row, index) => {
           if (index >= raffleRows.length - 1) return null;
-      
+        
           const rowStyle = {
             backgroundColor: index % 2 === 0 ? settings.theme.rowEvenBgColor : settings.theme.rowOddBgColor,
             color: settings.theme.textColor,
           };
-      
+        
           return (
             <tr key={index} style={rowStyle}>
               <td className="px-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
+                <div ref={el => expandedRowRefs.current[index] = el} className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col">
                     <input
                       ref={el => inputRefs.current[index * 2] = el}
                       type="text"
@@ -404,8 +451,8 @@ const konutData = [
                       placeholder="Katılımcı Sıra No"
                     />
                     {row.katilimciBilgileri && (
-                      <div className="bg-blue-100 p-2 rounded">
-                        <h3 className="font-bold">Katılımcı Bilgileri</h3>
+                      <div className="bg-blue-50 p-3 rounded shadow-sm flex-grow">
+                        <h3 className="font-bold text-lg mb-2">Katılımcı Bilgileri</h3>
                         <p><strong>Ad Soyad:</strong> {row.katilimciBilgileri['ADI SOYADI']}</p>
                         <p><strong>T.C. No:</strong> {row.katilimciBilgileri['T.C No']}</p>
                         <p><strong>Başvuru Türü:</strong> {row.katilimciBilgileri['Başvuru Türü']}</p>
@@ -413,7 +460,7 @@ const konutData = [
                       </div>
                     )}
                   </div>
-                  <div>
+                  <div className="flex flex-col">
                     <input
                       ref={el => inputRefs.current[index * 2 + 1] = el}
                       type="text"
@@ -427,8 +474,8 @@ const konutData = [
                       placeholder="Konut Sıra No"
                     />
                     {row.konutBilgileri && (
-                      <div className="bg-green-100 p-2 rounded">
-                        <h3 className="font-bold">Konut Bilgileri</h3>
+                      <div className="bg-green-50 p-3 rounded shadow-sm flex-grow">
+                        <h3 className="font-bold text-lg mb-2">Konut Bilgileri</h3>
                         <p><strong>Blok No:</strong> {row.konutBilgileri['BLOK NO']}</p>
                         <p><strong>Kat No:</strong> {row.konutBilgileri['KAT NO']}</p>
                         <p><strong>Daire No:</strong> {row.konutBilgileri['DAİRE NO']}</p>
@@ -441,10 +488,59 @@ const konutData = [
               </td>
             </tr>
           );
+        };  
+
+        const renderTabularRow = (row, index) => {
+          if (index >= raffleRows.length - 1) return null;
+        
+          const rowStyle = {
+            backgroundColor: index % 2 === 0 ? settings.theme.rowEvenBgColor : settings.theme.rowOddBgColor,
+            color: settings.theme.textColor,
+          };
+        
+          return (
+            <tr key={index} ref={el => rowRefs.current[index] = el} style={rowStyle} className="transition-all duration-300 ease-in-out">
+              <td className="px-2 py-2 w-1/12">
+                <input
+                  ref={el => inputRefs.current[index * 2] = el}
+                  type="text"
+                  value={row.katilimciSiraNo}
+                  onChange={(e) => handleInputChange(index, 'katilimciSiraNo', e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, index, 'katilimciSiraNo')}
+                  onFocus={() => handleFocus(index, 'katilimciSiraNo')}
+                  onBlur={() => handleBlur(index, 'katilimciSiraNo')}
+                  onClick={() => handleCellClick(index, 'katilimciSiraNo')}
+                  className="w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300"
+                  placeholder="Katılımcı Sıra No"
+                />
+              </td>
+              <td className="px-2 py-2 w-1/12">
+                <input
+                  ref={el => inputRefs.current[index * 2 + 1] = el}
+                  type="text"
+                  value={row.konutSiraNo}
+                  onChange={(e) => handleInputChange(index, 'konutSiraNo', e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, index, 'konutSiraNo')}
+                  onFocus={() => handleFocus(index, 'konutSiraNo')}
+                  onBlur={() => handleBlur(index, 'konutSiraNo')}
+                  onClick={() => handleCellClick(index, 'konutSiraNo')}
+                  className="w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300"
+                  placeholder="Konut Sıra No"
+                />
+              </td>
+              <td className="px-2 py-2 w-2/12">{row.katilimciBilgileri ? row.katilimciBilgileri['ADI SOYADI'] : ''}</td>
+              <td className="px-2 py-2 w-1/12">{row.katilimciBilgileri ? row.katilimciBilgileri['T.C No'] : ''}</td>
+              <td className="px-2 py-2 w-2/12">{row.katilimciBilgileri ? row.katilimciBilgileri['Başvuru Türü'] : ''}</td>
+              <td className="px-2 py-2 w-1/12">{row.konutBilgileri ? row.konutBilgileri['BLOK NO'] : ''}</td>
+              <td className="px-2 py-2 w-1/12">{row.konutBilgileri ? row.konutBilgileri['DAİRE NO'] : ''}</td>
+              <td className="px-2 py-2 w-1/12">{row.konutBilgileri ? row.konutBilgileri['ODA SAYISI'] : ''}</td>
+              <td className="px-2 py-2 w-1/12">{row.konutBilgileri ? row.konutBilgileri['BRÜT (m²)'] : ''}</td>
+            </tr>
+          );
         };
       
         return (
-          <div className="min-h-screen bg-gray-100 flex flex-col">
+          <div className="min-h-screen bg-gray-100 flex flex-col" style={{fontFamily: settings.theme.font}}>
             <header className="bg-white shadow-md sticky top-0 z-10">
               <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-gray-900">
@@ -455,14 +551,15 @@ const konutData = [
                   className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded inline-flex items-center transition-colors duration-300"
                 >
                   <FaExchangeAlt className="mr-2" />
-                  Toggle Layout
+                  {settings.layout === 'default' ? 'Genişletilmiş Görünüm' : 
+                   settings.layout === 'expanded' ? 'Tablo Görünümü' : 'Varsayılan Görünüm'}
                 </button>
               </div>
             </header>
             <main className="flex-grow overflow-hidden">
               <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-                <div className="overflow-x-auto">
-                  <table ref={tableRef} className="min-w-full bg-white" style={{fontFamily: settings.theme.font}}>
+                <div className="overflow-x-auto bg-white shadow-md rounded-lg">
+                  <table ref={tableRef} className="min-w-full" style={{fontFamily: settings.theme.font}}>
                     <thead className="bg-gray-50 sticky top-0">
                       <tr>
                         {settings.layout === 'default' ? (
@@ -472,14 +569,28 @@ const konutData = [
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Katılımcı Bilgileri</th>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Konut Bilgileri</th>
                           </>
-                        ) : (
+                        ) : settings.layout === 'expanded' ? (
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kura Bilgileri</th>
+                        ) : (
+                          <>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Katılımcı Sıra No</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Konut Sıra No</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ad Soyad</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">T.C. No</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Başvuru Türü</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Blok No</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Daire No</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oda Sayısı</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brüt Alan</th>
+                          </>
                         )}
                       </tr>
                     </thead>
                     <tbody>
                       {raffleRows.map((row, index) => 
-                        settings.layout === 'default' ? renderRow(row, index) : renderExpandedRow(row, index)
+                        settings.layout === 'default' ? renderRow(row, index) : 
+                        settings.layout === 'expanded' ? renderExpandedRow(row, index) : 
+                        renderTabularRow(row, index)
                       )}
                     </tbody>
                   </table>
